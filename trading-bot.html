@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradeBot AI — Stock Signals & Investment Advisor</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #03080d;
+    --surface: #08131c;
+    --surface2: #0d1e2d;
+    --surface3: #112436;
+    --border: #163347;
+    --accent: #00d4ff;
+    --accent2: #00ff9d;
+    --warn: #ff6b35;
+    --text: #b8d4e8;
+    --muted: #3d6480;
+    --profit: #00ff9d;
+    --loss: #ff3d57;
+    --neutral: #f0c040;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'IBM Plex Mono', monospace; background: var(--bg); color: var(--text); min-height: 100vh; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background: radial-gradient(ellipse 60% 40% at 20% 10%, rgba(0,212,255,0.04) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 30% at 80% 80%, rgba(0,255,157,0.03) 0%, transparent 60%);
+    pointer-events: none; z-index: 0;
+  }
+  body::after {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px);
+    background-size: 44px 44px; pointer-events: none; z-index: 0;
+  }
+  .wrapper { position: relative; z-index: 1; max-width: 1300px; margin: 0 auto; padding: 16px; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; margin-bottom: 16px; position: relative; overflow: hidden;
+  }
+  header::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), var(--accent), transparent);
+    background-size: 200% 100%; animation: shimmer 3s linear infinite;
+  }
+  @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+  .logo { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; }
+  .logo span { color: var(--accent); }
+  .logo sub { font-size: 10px; color: var(--muted); font-weight: 400; vertical-align: middle; margin-left: 6px; }
+  .header-center { display: flex; gap: 24px; }
+  .hstat-val { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; color: #fff; }
+  .hstat-val.up { color: var(--profit); }
+  .hstat-label { font-size: 9px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+  .status-badge { display: flex; align-items: center; gap: 7px; font-size: 10px; color: var(--accent2); background: rgba(0,255,157,0.07); border: 1px solid rgba(0,255,157,0.2); padding: 6px 14px; border-radius: 20px; }
+  .dot { width: 7px; height: 7px; background: var(--accent2); border-radius: 50%; animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.8)} }
+
+  .tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; margin-bottom: 16px; }
+  .tab { flex: 1; padding: 10px; text-align: center; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600; border-radius: 7px; cursor: pointer; transition: all .2s; color: var(--muted); border: none; background: transparent; }
+  .tab.active { background: var(--surface3); color: var(--accent); border: 1px solid var(--border); }
+  .tab:hover:not(.active) { color: var(--text); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .signals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .signal-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; position: relative; overflow: hidden; cursor: pointer; transition: all .25s; }
+  .signal-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,212,255,0.1); }
+  .signal-card::before { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; border-radius: 12px 0 0 12px; }
+  .signal-card.buy::before { background: var(--profit); }
+  .signal-card.sell::before { background: var(--loss); }
+  .signal-card.hold::before { background: var(--neutral); }
+  .sc-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .sc-name { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: #fff; }
+  .sc-sector { font-size: 9px; color: var(--muted); margin-top: 2px; }
+  .signal-badge { font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 12px; letter-spacing: 1px; }
+  .signal-badge.buy { background: rgba(0,255,157,0.1); color: var(--profit); border: 1px solid rgba(0,255,157,0.25); }
+  .signal-badge.sell { background: rgba(255,61,87,0.1); color: var(--loss); border: 1px solid rgba(255,61,87,0.25); }
+  .signal-badge.hold { background: rgba(240,192,64,0.1); color: var(--neutral); border: 1px solid rgba(240,192,64,0.25); }
+  .sc-price { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 10px; }
+  .sc-price span { font-size: 11px; margin-left: 6px; }
+  .sc-price span.up { color: var(--profit); }
+  .sc-price span.down { color: var(--loss); }
+  .entry-exit { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+  .ee-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 7px 8px; text-align: center; }
+  .ee-label { font-size: 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+  .ee-val { font-size: 12px; font-weight: 600; }
+  .ee-val.entry { color: var(--profit); }
+  .ee-val.target { color: var(--accent); }
+  .ee-val.stop { color: var(--loss); }
+  .fund-bars { margin-top: 8px; }
+  .fb-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .fb-label { font-size: 9px; color: var(--muted); width: 55px; flex-shrink: 0; }
+  .fb-track { flex: 1; height: 4px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+  .fb-fill { height: 100%; border-radius: 3px; }
+  .fb-score { font-size: 9px; color: var(--text); width: 24px; text-align: right; }
+
+  .chart-area { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .chart-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .chart-title select { background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 4px 8px; border-radius: 6px; outline: none; cursor: pointer; }
+  .candle-chart { height: 160px; display: flex; align-items: flex-end; gap: 3px; padding-bottom: 4px; }
+  .candle-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+  .candle-wick { width: 1px; background: var(--muted); }
+  .candle-body { width: 70%; min-height: 3px; border-radius: 2px; }
+  .candle-body.bull { background: var(--profit); }
+  .candle-body.bear { background: var(--loss); }
+  .chart-indicators { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .ind-badge { font-size: 10px; padding: 4px 10px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); }
+  .ind-badge.bullish { color: var(--profit); border-color: rgba(0,255,157,0.2); }
+  .ind-badge.bearish { color: var(--loss); border-color: rgba(255,61,87,0.2); }
+  .ind-badge.neutral { color: var(--neutral); border-color: rgba(240,192,64,0.2); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 340px; gap: 14px; }
+  .chat-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; height: 560px; }
+  .chat-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .chat-icon { width: 32px; height: 32px; background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.3); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .chat-title { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: #fff; }
+  .chat-sub { font-size: 9px; color: var(--muted); margin-top: 2px; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; scroll-behavior: smooth; }
+  .chat-messages::-webkit-scrollbar { width: 3px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .msg { max-width: 88%; padding: 10px 13px; border-radius: 10px; font-size: 12px; line-height: 1.65; animation: fadeUp .3s ease; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  .msg.bot { background: var(--surface2); border: 1px solid var(--border); align-self: flex-start; border-top-left-radius: 2px; }
+  .msg.user { background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.2); align-self: flex-end; color: #fff; border-top-right-radius: 2px; }
+  .msg-label { font-size: 8px; color: var(--muted); margin-bottom: 5px; letter-spacing: 1px; text-transform: uppercase; }
+  .typing { display: flex; gap: 4px; align-items: center; padding: 11px 13px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; border-top-left-radius: 2px; width: fit-content; }
+  .typing span { width: 5px; height: 5px; background: var(--accent); border-radius: 50%; animation: bounce 1.2s ease infinite; }
+  .typing span:nth-child(2){animation-delay:.2s} .typing span:nth-child(3){animation-delay:.4s}
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-5px)} }
+  .chat-input-area { padding: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+  .chat-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 13px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 11px; outline: none; transition: border-color .2s; }
+  .chat-input:focus { border-color: var(--accent); }
+  .chat-input::placeholder { color: var(--muted); }
+  .input-row { display: flex; gap: 6px; }
+  .send-btn { flex: 1; background: linear-gradient(135deg, var(--accent), #0099cc); border: none; border-radius: 8px; color: #000; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 11px; padding: 9px; cursor: pointer; transition: all .2s; letter-spacing: 1px; }
+  .send-btn:hover { opacity: .9; transform: translateY(-1px); }
+  .send-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .quick-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+  .chip { background: var(--surface3); border: 1px solid var(--border); border-radius: 14px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 5px 10px; cursor: pointer; transition: all .2s; white-space: nowrap; }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .side-panel { display: flex; flex-direction: column; gap: 12px; }
+  .side-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .side-card-title { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; color: #fff; margin-bottom: 12px; display: flex; align-items: center; gap: 7px; }
+  .watchlist-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: all .2s; }
+  .watchlist-item:last-child { border-bottom: none; }
+  .watchlist-item:hover { padding-left: 4px; }
+  .wl-name { font-size: 12px; font-weight: 600; color: #fff; }
+  .wl-price { font-size: 11px; color: var(--text); }
+  .wl-change { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; }
+  .wl-change.up { color: var(--profit); background: rgba(0,255,157,0.08); }
+  .wl-change.down { color: var(--loss); background: rgba(255,61,87,0.08); }
+  .sip-row { display: flex; justify-content: space-between; font-size: 11px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .sip-row:last-child { border-bottom: none; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--accent2); }
+  .sip-key { color: var(--muted); }
+  .disclaimer { padding: 10px 13px; background: rgba(255,107,53,0.06); border: 1px solid rgba(255,107,53,0.2); border-radius: 8px; font-size: 9px; color: rgba(255,107,53,0.75); line-height: 1.6; }
+
+  @media (max-width: 900px) { .signals-grid { grid-template-columns: 1fr 1fr; } .two-col { grid-template-columns: 1fr; } }
+  @media (max-width: 600px) { .signals-grid { grid-template-columns: 1fr; } .header-center { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="logo">Trade<span>Bot</span> AI <sub>v2.0</sub></div>
+    <div class="header-center">
+      <div class="hstat"><div class="hstat-val">₹1,000</div><div class="hstat-label">Capital</div></div>
+      <div class="hstat"><div class="hstat-val up">₹1,00,000</div><div class="hstat-label">1M Target</div></div>
+      <div class="hstat"><div class="hstat-val up">₹10,00,000</div><div class="hstat-label">SIP Goal</div></div>
+    </div>
+    <div class="status-badge"><div class="dot"></div>SIGNALS LIVE</div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('signals',this)">📊 Stock Signals</button>
+    <button class="tab" onclick="switchTab('chat',this)">🤖 AI Advisor</button>
+    <button class="tab" onclick="switchTab('sip',this)">💰 SIP Planner</button>
+  </div>
+
+  <!-- SIGNALS TAB -->
+  <div class="tab-content active" id="tab-signals">
+    <div class="signals-grid">
+
+      <div class="signal-card buy" onclick="goChat('Give me detailed entry exit stop loss for HDFC Bank today with technical analysis')">
+        <div class="sc-top">
+          <div><div class="sc-name">HDFC Bank</div><div class="sc-sector">Banking · NSE: HDFCBANK</div></div>
+          <div class="signal-badge buy">▲ BUY</div>
+        </div>
+        <div class="sc-price">₹1,642 <span class="up">+1.2%</span></div>
+        <div class="entry-exit">
+          <div class="ee-box"><div class="ee-label">Entry</div><div class="ee-val entry">₹1,638</div></div>
+          <div class="ee-box"><div class="ee-label">Target</div><div class="ee-val target">₹1,710</div></div>
+          <div class="ee-box"><div class="ee-label">Stop Loss</div><div class="ee-val stop">₹1,605</div></div>
+        </div>
+        <div class="fund-bars">
+          <div class="fb-row"><span class="fb-label">ROE</span><div class="fb-track"><div class="fb-fill" style="width:82%;background:var(--profit)"></div></div><span class="fb-score">16%</span></div>
+          <div class="fb-row"><span class="fb-label">Debt/Eq</span><div class="fb-track"><div class="fb-fill" style="width:90%;background:var(--accent)"></div></div><span class="fb-score">Low</span></div>
+          <div class="fb-row"><span class="fb-label">Strength</span><div class="fb-track"><div class="fb-fill" style="width:92%;background:var(--accent2)"></div></div><span class="fb-score">9.2</span></div>
+        </div>
+      </div>
+
+      <div class="signal-card buy" onclick="goChat('TCS stock entry exit target stop loss today swing trade analysis')">
+        <div class="sc-top">
+          <div><div class="sc-name">TCS</div><div class="sc-sector">IT Services · NSE: TCS</div></div>
+          <div class="signal-badge buy">▲ BUY</div>
+        </div>
+        <div class="sc-price">₹3,890 <span class="up">+0.8%</span></div>
+        <div class="entry-exit">
+          <div class="ee-box"><div class="ee-label">Entry</div><div class="ee-val entry">₹3,870</div></div>
+          <div class="ee-box"><div class="ee-label">Target</div><div class="ee-val target">₹4,100</div></div>
+          <div class="ee-box"><div class="ee-label">Stop Loss</div><div class="ee-val stop">₹3,780</div></div>
+        </div>
+        <div class="fund-bars">
+          <div class="fb-row"><span class="fb-label">ROE</span><div class="fb-track"><div class="fb-fill" style="width:88%;background:var(--profit)"></div></div><span class="fb-score">47%</span></div>
+          <div class="fb-row"><span class="fb-label">Debt/Eq</span><div class="fb-track"><div class="fb-fill" style="width:95%;background:var(--accent)"></div></div><span class="fb-score">Zero</span></div>
+          <div class="fb-row"><span class="fb-label">Strength</span><div class="fb-track"><div class="fb-fill" style="width:95%;background:var(--accent2)"></div></div><span class="fb-score">9.5</span></div>
+        </div>
+      </div>
+
+      <div class="signal-card buy" onclick="goChat('Mahindra M&M entry exit stop loss today technical analysis buy signal reason')">
+        <div class="sc-top">
+          <div><div class="sc-name">M&M</div><div class="sc-sector">Auto · NSE: M&M</div></div>
+          <div class="signal-badge buy">▲ BUY</div>
+        </div>
+        <div class="sc-price">₹2,940 <span class="up">+1.9%</span></div>
+        <div class="entry-exit">
+          <div class="ee-box"><div class="ee-label">Entry</div><div class="ee-val entry">₹2,920</div></div>
+          <div class="ee-box"><div class="ee-label">Target</div><div class="ee-val target">₹3,180</div></div>
+          <div class="ee-box"><div class="ee-label">Stop Loss</div><div class="ee-val stop">₹2,830</div></div>
+        </div>
+        <div class="fund-bars">
+          <div class="fb-row"><span class="fb-label">ROE</span><div class="fb-track"><div class="fb-fill" style="width:76%;background:var(--profit)"></div></div><span class="fb-score">23%</span></div>
+          <div class="fb-row"><span class="fb-label">Debt/Eq</span><div class="fb-track"><div class="fb-fill" style="width:70%;background:var(--accent)"></div></div><span class="fb-score">Med</span></div>
+          <div class="fb-row"><span class="fb-label">Strength</span><div class="fb-track"><div class="fb-fill" style="width:84%;background:var(--accent2)"></div></div><span class="fb-score">8.4</span></div>
+        </div>
+      </div>
+
+      <div class="signal-card hold" onclick="goChat('ICICI Bank hold or buy? Entry exit stop loss levels with technical reason')">
+        <div class="sc-top">
+          <div><div class="sc-name">ICICI Bank</div><div class="sc-sector">Banking · NSE: ICICIBANK</div></div>
+          <div class="signal-badge hold">◆ HOLD</div>
+        </div>
+        <div class="sc-price">₹1,275 <span class="up">+0.3%</span></div>
+        <div class="entry-exit">
+          <div class="ee-box"><div class="ee-label">Add At</div><div class="ee-val entry">₹1,240</div></div>
+          <div class="ee-box"><div class="ee-label">Target</div><div class="ee-val target">₹1,380</div></div>
+          <div class="ee-box"><div class="ee-label">Stop Loss</div><div class="ee-val stop">₹1,210</div></div>
+        </div>
+        <div class="fund-bars">
+          <div class="fb-row"><span class="fb-label">ROE</span><div class="fb-track"><div class="fb-fill" style="width:85%;background:var(--profit)"></div></div><span class="fb-score">18%</span></div>
+          <div class="fb-row"><span class="fb-label">Debt/Eq</span><div class="fb-track"><div class="fb-fill" style="width:88%;background:var(--accent)"></div></div><span class="fb-score">Low</span></div>
+          <div class="fb-row"><span class="fb-label">Strength</span><div class="fb-track"><div class="fb-fill" style="width:90%;background:var(--neutral)"></div></div><span class="fb-score">9.0</span></div>
+        </div>
+      </div>
+
+      <div class="signal-card hold" onclick="goChat('ITC stock analysis hold or sell? Entry exit levels and why is signal hold')">
+        <div class="sc-top">
+          <div><div class="sc-name">ITC</div><div class="sc-sector">FMCG · NSE: ITC</div></div>
+          <div class="signal-badge hold">◆ HOLD</div>
+        </div>
+        <div class="sc-price">₹472 <span class="down">-0.4%</span></div>
+        <div class="entry-exit">
+          <div class="ee-box"><div class="ee-label">Add At</div><div class="ee-val entry">₹455</div></div>
+          <div class="ee-box"><div class="ee-label">Target</div><div class="ee-val target">₹510</div></div>
+          <div class="ee-box"><div class="ee-label">Stop Loss</div><div class="ee-val stop">₹440</div></div>
+        </div>
+        <div class="fund-bars">
+          <div class="fb-row"><span class="fb-label">ROE</span><div class="fb-track"><div class="fb-fill" style="width:80%;background:var(--profit)"></div></div><span class="fb-score">29%</span></div>
+          <div class="fb-row"><span class="fb-label">Debt/Eq</span><div class="fb-track"><div class="fb-fill" style="width:98%;background:var(--accent)"></div></div><span class="fb-score">Zero</span></div>
+          <div class="fb-row"><span class="fb-label">Strength</span><div class="fb-track"><div class="fb-fill" style="width:87%;background:var(--neutral)"></div></div><span class="fb-score">8.7</span></div>
+        </div>
+      </div>
+
+      <div class="signal-card sell" onclick="goChat('BEL Bharat Electronics book profit or exit signal — explain why and when to re-enter')">
+        <div class="sc-top">
+          <div><div class="sc-name">BEL</div><div class="sc-sector">Defence · NSE: BEL</div></div>
+          <div class="signal-badge sell">▼ BOOK</div>
+        </div>
+        <div class="sc-price">₹285 <span class="down">-1.6%</span></div>
+        <div class="entry-exit">
+          <div class="ee-box"><div class="ee-label">Exit At</div><div class="ee-val stop">₹285</div></div>
+          <div class="ee-box"><div class="ee-label">Re-Entry</div><div class="ee-val entry">₹268</div></div>
+          <div class="ee-box"><div class="ee-label">New Target</div><div class="ee-val target">₹315</div></div>
+        </div>
+        <div class="fund-bars">
+          <div class="fb-row"><span class="fb-label">ROE</span><div class="fb-track"><div class="fb-fill" style="width:72%;background:var(--profit)"></div></div><span class="fb-score">25%</span></div>
+          <div class="fb-row"><span class="fb-label">Debt/Eq</span><div class="fb-track"><div class="fb-fill" style="width:93%;background:var(--accent)"></div></div><span class="fb-score">Zero</span></div>
+          <div class="fb-row"><span class="fb-label">Strength</span><div class="fb-track"><div class="fb-fill" style="width:82%;background:var(--loss)"></div></div><span class="fb-score">8.2</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="chart-area">
+      <div class="chart-title">
+        📉 Technical Chart View
+        <select id="stockSelect" onchange="updateChart()">
+          <option>HDFC Bank</option><option>TCS</option><option>M&M</option><option>ICICI Bank</option><option>ITC</option><option>BEL</option>
+        </select>
+        <span style="font-size:10px;color:var(--muted);margin-left:auto;">Click any card → get instant AI analysis</span>
+      </div>
+      <div class="candle-chart" id="candleChart"></div>
+      <div class="chart-indicators" id="chartIndicators"></div>
+    </div>
+
+    <div class="disclaimer">⚠️ <strong>Educational Only:</strong> Entry/exit levels are AI-generated estimates based on historical patterns. Not SEBI-registered advice. Prices are approximate. Verify on your broker before trading.</div>
+  </div>
+
+  <!-- CHAT TAB -->
+  <div class="tab-content" id="tab-chat">
+    <div class="two-col">
+      <div class="chat-panel">
+        <div class="chat-header">
+          <div class="chat-icon">🤖</div>
+          <div><div class="chat-title">AI Stock Advisor</div><div class="chat-sub">Entry · Exit · Stop Loss · Fundamentals · SIP</div></div>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+          <div class="msg bot">
+            <div class="msg-label">TradeBot</div>
+            Namaste! 🙏 Ask me about any NSE/BSE stock and I'll give you:<br><br>
+            ✅ BUY / SELL / HOLD signal<br>
+            📍 Exact entry price<br>
+            🎯 Target 1 &amp; Target 2<br>
+            🛑 Stop loss level<br>
+            📊 RSI, MACD, trend reason<br>
+            💪 Fundamental strength score<br><br>
+            <i>Try: "Give entry exit for Reliance today" or click any signal card!</i>
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <div class="quick-chips">
+            <div class="chip" onclick="quickAsk('Give entry exit stop loss for Reliance Industries today')">📈 Reliance</div>
+            <div class="chip" onclick="quickAsk('Top 3 stocks to buy today under ₹500 with entry exit for small capital')">🎯 Top 3 picks</div>
+            <div class="chip" onclick="quickAsk('Weekly compounding trading plan from ₹1000 to ₹1 lakh in 1 month')">🗓️ ₹1K→₹1L plan</div>
+            <div class="chip" onclick="quickAsk('Nifty 50 trend today — bullish or bearish? Should I buy or sell?')">🏦 Nifty outlook</div>
+            <div class="chip" onclick="quickAsk('How to use RSI and MACD together for entry exit in intraday trading?')">📊 RSI+MACD guide</div>
+          </div>
+          <div class="input-row">
+            <input class="chat-input" id="chatInput" type="text" placeholder="e.g. Give entry/exit for Infosys today..." />
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">ASK AI</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="side-panel">
+        <div class="side-card">
+          <div class="side-card-title">👁️ Watchlist — click for AI signal</div>
+          <div class="watchlist-item" onclick="quickAsk('Reliance Industries buy or sell today entry exit stop loss')">
+            <div><div class="wl-name">RELIANCE</div><div style="font-size:9px;color:var(--muted)">NSE · Conglomerate</div></div>
+            <div><div class="wl-price">₹2,840</div><div class="wl-change up">+0.9%</div></div>
+          </div>
+          <div class="watchlist-item" onclick="quickAsk('Infosys stock signal today entry exit stop loss technical analysis')">
+            <div><div class="wl-name">INFY</div><div style="font-size:9px;color:var(--muted)">NSE · IT</div></div>
+            <div><div class="wl-price">₹1,580</div><div class="wl-change up">+1.4%</div></div>
+          </div>
+          <div class="watchlist-item" onclick="quickAsk('SBI State Bank India buy sell hold entry exit today')">
+            <div><div class="wl-name">SBIN</div><div style="font-size:9px;color:var(--muted)">NSE · Banking</div></div>
+            <div><div class="wl-price">₹782</div><div class="wl-change down">-0.6%</div></div>
+          </div>
+          <div class="watchlist-item" onclick="quickAsk('Tata Motors entry exit stop loss today buy signal analysis')">
+            <div><div class="wl-name">TATAMOTORS</div><div style="font-size:9px;color:var(--muted)">NSE · Auto</div></div>
+            <div><div class="wl-price">₹680</div><div class="wl-change up">+2.1%</div></div>
+          </div>
+          <div class="watchlist-item" onclick="quickAsk('Apollo Hospitals buy sell hold today entry exit price target')">
+            <div><div class="wl-name">APOLLOHOSP</div><div style="font-size:9px;color:var(--muted)">NSE · Healthcare</div></div>
+            <div><div class="wl-price">₹6,380</div><div class="wl-change down">-0.3%</div></div>
+          </div>
+        </div>
+        <div class="side-card">
+          <div class="side-card-title">🛡️ Golden Risk Rules</div>
+          <div style="font-size:11px;line-height:1.8;color:var(--text)">
+            <div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--accent)">R1</span>Never risk more than 2% per trade</div>
+            <div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--accent)">R2</span>Max 10% total capital at risk/day</div>
+            <div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--accent)">R3</span>Minimum 3:1 reward-to-risk ratio</div>
+            <div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--accent)">R4</span>Always honour stop loss — no hope</div>
+            <div style="display:flex;gap:8px;padding:4px 0"><span style="color:var(--accent)">R5</span>Book 50% profit at first target</div>
+          </div>
+        </div>
+        <div class="disclaimer">⚠️ AI signals are educational. Not SEBI advice. Always use stop losses.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIP TAB -->
+  <div class="tab-content" id="tab-sip">
+    <div class="two-col">
+      <div class="chat-panel">
+        <div class="chat-header">
+          <div class="chat-icon">💰</div>
+          <div><div class="chat-title">SIP Advisor Bot</div><div class="chat-sub">₹2,000/month × 5 years → ₹10 Lakh goal</div></div>
+        </div>
+        <div class="chat-messages" id="sipMessages">
+          <div class="msg bot">
+            <div class="msg-label">SIP Bot</div>
+            Your goal: <b>₹10,00,000 in 5 years</b> 💰<br><br>
+            Reality check with ₹2,000/month at 12% → <b>~₹1.64L</b><br>
+            To reach ₹10L you need ~<b>₹9,250/month at 12%</b><br><br>
+            Smart strategies to bridge the gap:<br>
+            📈 Step-up SIP (increase 20%/year)<br>
+            🎯 High-return equity funds (16-20%)<br>
+            💡 Add trading profits as lump sums<br><br>
+            Ask me about fund picks, SIP calculation, or goal planning!
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <div class="quick-chips">
+            <div class="chip" onclick="quickSip('Best 3 mutual funds for SIP to build ₹10 lakh in 5 years India 2025')">🏆 Top funds</div>
+            <div class="chip" onclick="quickSip('How to reach ₹10 lakh in 5 years with step-up SIP starting ₹2000 per month?')">📈 Step-up plan</div>
+            <div class="chip" onclick="quickSip('How much monthly SIP do I need to get exactly ₹10 lakh in 5 years at 15% and 18% CAGR?')">🧮 Calculator</div>
+            <div class="chip" onclick="quickSip('Parag Parikh flexi cap vs Mirae Asset vs Axis Small Cap — which is best for 5 year SIP?')">⚖️ Compare funds</div>
+          </div>
+          <div class="input-row">
+            <input class="chat-input" id="sipInput" type="text" placeholder="Ask about SIP funds, returns, goal planning..." />
+            <button class="send-btn" id="sipSendBtn" onclick="sendSipMessage()">ASK AI</button>
+          </div>
+        </div>
+      </div>
+      <div class="side-panel">
+        <div class="side-card">
+          <div class="side-card-title">📊 SIP Projections (₹2K/month)</div>
+          <div class="sip-row"><span class="sip-key">Duration</span><span>60 months (5 yr)</span></div>
+          <div class="sip-row"><span class="sip-key">Total Invested</span><span>₹1,20,000</span></div>
+          <div class="sip-row"><span class="sip-key">At 10% CAGR</span><span>₹1,55,924</span></div>
+          <div class="sip-row"><span class="sip-key">At 12% CAGR</span><span>₹1,63,879</span></div>
+          <div class="sip-row"><span class="sip-key">At 18% CAGR</span><span>₹1,95,000</span></div>
+          <div class="sip-row"><span class="sip-key">🎯 Your Target</span><span>₹10,00,000</span></div>
+        </div>
+        <div class="side-card">
+          <div class="side-card-title">🏆 Recommended SIP Funds</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="background:var(--surface2);border:1px solid rgba(0,255,157,0.15);border-radius:8px;padding:10px;cursor:pointer" onclick="quickSip('Tell me about Parag Parikh Flexi Cap Fund SIP — expected returns, risk, and why to invest')">
+              <div style="font-size:12px;font-weight:600;color:#fff">Parag Parikh Flexi Cap</div>
+              <div style="font-size:10px;color:var(--accent2);margin-top:2px">~21% CAGR · Large+Mid+Global mix</div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid rgba(0,255,157,0.15);border-radius:8px;padding:10px;cursor:pointer" onclick="quickSip('Mirae Asset Emerging Bluechip fund SIP analysis — returns, risk, entry exit strategy')">
+              <div style="font-size:12px;font-weight:600;color:#fff">Mirae Asset Emerging Bluechip</div>
+              <div style="font-size:10px;color:var(--accent2);margin-top:2px">~18% CAGR · Large & Mid Cap</div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid rgba(240,192,64,0.15);border-radius:8px;padding:10px;cursor:pointer" onclick="quickSip('Axis Small Cap Fund SIP — risk vs reward for 5 year goal of ₹10 lakh')">
+              <div style="font-size:12px;font-weight:600;color:#fff">Axis Small Cap Fund</div>
+              <div style="font-size:10px;color:var(--neutral);margin-top:2px">~24% CAGR · High risk/reward</div>
+            </div>
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;cursor:pointer" onclick="quickSip('Nifty 50 index fund SIP — safe base allocation for 5 year ₹10 lakh goal')">
+              <div style="font-size:12px;font-weight:600;color:#fff">Nifty 50 Index Fund</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:2px">~12% avg · Low cost safe base</div>
+            </div>
+          </div>
+        </div>
+        <div class="disclaimer">⚠️ Mutual funds subject to market risk. Past returns ≠ future performance. Read all scheme documents carefully.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const TRADE_SYS = `You are TradeBot AI, an expert Indian stock market advisor for NSE/BSE.
+
+User's goals:
+1. Trading: Grow ₹1,000 → ₹1,00,000 in ONE month
+2. SIP: ₹2,000/month × 5 years → ₹10,00,000 corpus
+
+For EVERY stock query, provide this EXACT format:
+
+📌 [STOCK NAME] — [BUY/SELL/HOLD]
+
+📍 Entry: ₹[price] (buy above this level)
+🎯 Target 1: ₹[price] (+X%)
+🎯 Target 2: ₹[price] (+X%)
+🛑 Stop Loss: ₹[price] (exit if broken)
+⏱️ Timeframe: [Intraday/Swing 2-5 days/Positional 2-4 weeks]
+
+📊 Technical Reason:
+• RSI: [value] — [overbought/oversold/neutral]
+• MACD: [bullish/bearish crossover or trend]
+• Support/Resistance: ₹[level]
+• Trend: [uptrend/downtrend/sideways]
+
+💪 Fundamentals (score /10):
+• ROE: X% | Debt: Low/Med/High | [1-2 sentence verdict]
+
+⚠️ Risk: [brief warning]
+
+Be specific with ₹ amounts. Keep under 250 words. For non-stock questions, give direct actionable advice.`;
+
+const SIP_SYS = `You are a SIP (Systematic Investment Plan) expert for Indian mutual funds.
+
+User goal: Build ₹10,00,000 in 5 years via SIP starting at ₹2,000/month.
+
+For fund recommendations, always include:
+📌 Fund name (exact AMC name)
+📈 Expected 5Y CAGR range
+💰 Suggested allocation
+🔢 Projected corpus at that return
+⚖️ Risk: Low/Medium/High
+🎯 Why suitable for ₹10L goal
+
+For calculation queries, use: M × [((1+r)^n - 1)/r] × (1+r)
+where M=monthly SIP, r=monthly rate (annual/12), n=months
+
+Always suggest step-up SIP strategy when relevant.
+Always recommend 2-3 specific funds. Keep under 220 words. Add brief disclaimer.`;
+
+const tradeHist = [], sipHist = [];
+
+function switchTab(id, el) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  el.classList.add('active');
+}
+
+function goChat(q) {
+  document.querySelectorAll('.tab')[1].click();
+  document.getElementById('chatInput').value = q;
+  sendMessage();
+}
+
+// Candle chart
+function updateChart() {
+  const chart = document.getElementById('candleChart');
+  const indBox = document.getElementById('chartIndicators');
+  chart.innerHTML = '';
+  const meta = {
+    'HDFC Bank': {rsi:58, macd:'Bullish', trend:'Uptrend', sig:'buy'},
+    'TCS':       {rsi:62, macd:'Bullish', trend:'Uptrend', sig:'buy'},
+    'M&M':       {rsi:67, macd:'Bullish', trend:'Strong Up', sig:'buy'},
+    'ICICI Bank':{rsi:52, macd:'Neutral', trend:'Sideways', sig:'hold'},
+    'ITC':       {rsi:48, macd:'Neutral', trend:'Sideways', sig:'hold'},
+    'BEL':       {rsi:38, macd:'Bearish', trend:'Downtrend', sig:'sell'},
+  };
+  const sel = document.getElementById('stockSelect').value;
+  const m = meta[sel];
+  const isBullish = m.sig === 'buy';
+  const isBearish = m.sig === 'sell';
+
+  for (let i = 0; i < 30; i++) {
+    const bull = isBullish ? Math.random() > 0.35 : isBearish ? Math.random() > 0.65 : Math.random() > 0.5;
+    const bodyH = 8 + Math.random() * 28;
+    const w1 = 2 + Math.random() * 10;
+    const w2 = 2 + Math.random() * 10;
+    const totalH = bodyH + w1 + w2;
+    const scale = (120 / 38) * (0.7 + Math.random() * 0.6);
+    const cw = document.createElement('div');
+    cw.className = 'candle-wrap';
+    cw.style.height = '100%';
+    cw.innerHTML = `
+      <div class="candle-wick" style="height:${w1*scale/totalH*totalH*0.9}px"></div>
+      <div class="candle-body ${bull?'bull':'bear'}" style="height:${Math.max(3,bodyH*0.8)}px;width:75%"></div>
+      <div class="candle-wick" style="height:${w2*scale/totalH*totalH*0.6}px"></div>
+    `;
+    chart.appendChild(cw);
+  }
+
+  const rc = m.rsi > 60 ? 'bullish' : m.rsi < 40 ? 'bearish' : 'neutral';
+  const mc = m.macd === 'Bullish' ? 'bullish' : m.macd === 'Bearish' ? 'bearish' : 'neutral';
+  const sc = m.sig === 'buy' ? 'bullish' : m.sig === 'sell' ? 'bearish' : 'neutral';
+  indBox.innerHTML = `
+    <div class="ind-badge ${rc}">RSI: ${m.rsi} — ${m.rsi>60?'Bullish zone':m.rsi<40?'Oversold zone':'Neutral'}</div>
+    <div class="ind-badge ${mc}">MACD: ${m.macd}</div>
+    <div class="ind-badge neutral">Trend: ${m.trend}</div>
+    <div class="ind-badge ${sc}">Signal: ${m.sig.toUpperCase()}</div>
+  `;
+}
+updateChart();
+
+// Chat
+function addMsg(id, text, role) {
+  const box = document.getElementById(id);
+  const d = document.createElement('div');
+  d.className = `msg ${role==='user'?'user':'bot'}`;
+  d.innerHTML = `<div class="msg-label">${role==='user'?'YOU':'AI BOT'}</div>${text.replace(/\n/g,'<br>')}`;
+  box.appendChild(d); box.scrollTop = box.scrollHeight;
+}
+function showTyping(id) {
+  const box = document.getElementById(id);
+  const t = document.createElement('div');
+  t.className='typing'; t.id=id+'-t';
+  t.innerHTML='<span></span><span></span><span></span>';
+  box.appendChild(t); box.scrollTop = box.scrollHeight;
+}
+function hideTyping(id) { const t = document.getElementById(id+'-t'); if(t) t.remove(); }
+
+async function callAI(sys, hist) {
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': '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',   // ← add this line
+      'anthropic-version': '2023-06-01',       // ← add this line
+      'anthropic-dangerous-direct-browser-ipc': 'true'  // ← for browser use
+    },
+    ...
+  });
+}}
+
+document.getElementById('chatInput').addEventListener('keypress', e => { if(e.key==='Enter') sendMessage(); });
+document.getElementById('sipInput').addEventListener('keypress', e => { if(e.key==='Enter') sendSipMessage(); });
+
+function quickAsk(q) {
+  document.getElementById('chatInput').value = q;
+  sendMessage();
+}
+function quickSip(q) {
+  document.getElementById('sipInput').value = q;
+  sendSipMessage();
+}
+
+async function sendMessage() {
+  const inp = document.getElementById('chatInput');
+  const btn = document.getElementById('sendBtn');
+  const text = inp.value.trim(); if(!text) return;
+  inp.value=''; btn.disabled=true;
+  addMsg('chatMessages', text, 'user');
+  tradeHist.push({role:'user', content:text});
+  showTyping('chatMessages');
+  try {
+    const reply = await callAI(TRADE_SYS, tradeHist);
+    hideTyping('chatMessages');
+    addMsg('chatMessages', reply, 'bot');
+    tradeHist.push({role:'assistant', content:reply});
+  } catch(e) {
+    hideTyping('chatMessages');
+    addMsg('chatMessages', '⚠️ Error connecting to AI. Please try again.', 'bot');
+  }
+  btn.disabled=false; inp.focus();
+}
+
+async function sendSipMessage() {
+  const inp = document.getElementById('sipInput');
+  const btn = document.getElementById('sipSendBtn');
+  const text = inp.value.trim(); if(!text) return;
+  inp.value=''; btn.disabled=true;
+  addMsg('sipMessages', text, 'user');
+  sipHist.push({role:'user', content:text});
+  showTyping('sipMessages');
+  try {
+    const reply = await callAI(SIP_SYS, sipHist);
+    hideTyping('sipMessages');
+    addMsg('sipMessages', reply, 'bot');
+    sipHist.push({role:'assistant', content:reply});
+  } catch(e) {
+    hideTyping('sipMessages');
+    addMsg('sipMessages', '⚠️ Error connecting to AI. Please try again.', 'bot');
+  }
+  btn.disabled=false; inp.focus();
+}
+</script>
+</body>
+</html>
